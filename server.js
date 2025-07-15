@@ -80,6 +80,28 @@ app.post("/update-user", (req, res) => {
   });
 });
 
+// Hapus user berdasarkan id
+app.post("/hapus-user", (req, res) => {
+  const { id } = req.body;
+  db.query("DELETE FROM users WHERE id = ?", [id], (err, result) => {
+    if (err) return res.status(500).json({ error: err });
+    res.json({ message: "User berhasil dihapus" });
+  });
+});
+
+// Endpoint update nilai status (checkbox)
+app.post("/update-checkbox", (req, res) => {
+  const { id, status } = req.body;
+  db.query(
+    "UPDATE users SET status = ? WHERE id = ?",
+    [status, id],
+    (err, result) => {
+      if (err) return res.status(500).json({ error: err });
+      res.json({ message: "Status berhasil diperbarui" });
+    }
+  );
+});
+
 // Jalankan server
 app.listen(port, () => {
   console.log(`Server berjalan di http://localhost:${port}`);
