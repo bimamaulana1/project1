@@ -31,7 +31,7 @@ app.get("/", (req, res) => {
 
 // Endpoint untuk menampilkan semua data dari tabel `data`
 app.get("/data", (req, res) => {
-  db.query("SELECT * FROM data", (err, results) => {
+  db.query("SELECT * FROM users", (err, results) => {
     if (err) {
       return res.status(500).json({ error: err });
     }
