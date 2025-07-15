@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>CRUD Clever Cloud</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 20px;
+      }
+      input {
+        margin: 5px;
+        padding: 5px;
+      }
+      table,
+      th,
+      td {
+        border: 1px solid #333;
+        border-collapse: collapse;
+        padding: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Manajemen Data User</h2>
+
+    <input type="text" id="nama" placeholder="Nama" />
+    <input type="email" id="email" placeholder="Email" />
+    <button onclick="tambahUser()">Tambah</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nama</th>
+          <th>Email</th>
+          <th>Aksi</th>
+        </tr>
+      </thead>
+      <tbody id="tabel-user"></tbody>
+    </table>
+
+    <script>
+      function loadData() {
+        fetch("/api/users")
+          .then((res) => res.json())
+          .then((data) => {
+            const tbody = document.getElementById("tabel-user");
+            tbody.innerHTML = "";
+            data.forEach((u) => {
+              tbody.innerHTML += `
+              <tr>
+                <td>${u.id}</td>
+                <td><input value="${u.nama}" onchange="editUser(${u.id}, this.value, null)" /></td>
+                <td><input value="${u.email}" onchange="editUser(${u.id}, null, this.value)" /></td>
+                <td><button onclick="hapusUser(${u.id})">Hapus</button></td>
+              </tr>`;
+            });
+          });
+      }
+
+      function tambahUser() {
+        const nama = document.getElementById("nama").value;
+        const email = document.getElementById("email").value;
+        fetch("/api/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nama, email }),
+        }).then(() => {
+          document.getElementById("nama").value = "";
+          document.getElementById("email").value = "";
+          loadData();
+        });
+      }
+
+      function editUser(id, nama, email) {
+        const row = [...document.querySelectorAll("tr")].find((r) =>
+          r.innerHTML.includes(`editUser(${id}`)
+        );
+        const inputs = row.querySelectorAll("input");
+        fetch(`/api/users/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nama: nama ?? inputs[0].value,
+            email: email ?? inputs[1].value,
+          }),
+        }).then(loadData);
+      }
+
+      function hapusUser(id) {
+        if (confirm("Yakin hapus?")) {
+          fetch(`/api/users/${id}`, { method: "DELETE" }).then(loadData);
+        }
+      }
+
+      loadData();
+    </script>
+  </body>
+</html>
