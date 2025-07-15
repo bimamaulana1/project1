@@ -62,6 +62,24 @@ app.post("/tambah-kolom", (req, res) => {
   });
 });
 
+app.post("/update-user", (req, res) => {
+  const { id, kolom, nilaiBaru } = req.body;
+
+  if (!id || !kolom || nilaiBaru === undefined) {
+    return res
+      .status(400)
+      .json({ error: "id, kolom, dan nilaiBaru wajib diisi" });
+  }
+
+  const query = `UPDATE users SET \`${kolom}\` = ? WHERE id = ?`;
+  db.query(query, [nilaiBaru, id], (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err });
+    }
+    res.json({ message: "Data berhasil diperbarui" });
+  });
+});
+
 // Jalankan server
 app.listen(port, () => {
   console.log(`Server berjalan di http://localhost:${port}`);
