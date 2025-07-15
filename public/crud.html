@@ -1,24 +1,38 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Tambah Kolom MySQL</title>
+    <title>Tambah Kolom dan Lihat Data</title>
     <style>
       body {
         font-family: sans-serif;
-        max-width: 400px;
+        max-width: 800px;
         margin: auto;
         padding: 20px;
       }
       input,
       button {
-        width: 100%;
         padding: 10px;
         margin-top: 10px;
+        width: 100%;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
       }
     </style>
   </head>
   <body>
-    <h2>Tambah Kolom ke Tabel MySQL</h2>
+    <h2>Tambah Kolom ke Tabel "users"</h2>
 
     <label for="namaKolom">Nama Kolom:</label>
     <input type="text" id="namaKolom" placeholder="Contoh: email" />
@@ -27,8 +41,16 @@
     <input type="text" id="tipeData" placeholder="Contoh: VARCHAR(100)" />
 
     <button onclick="tambahKolom()">Tambah Kolom</button>
+    <p id="hasil" style="margin-top: 10px; color: green"></p>
 
-    <p id="hasil" style="margin-top: 20px"></p>
+    <hr />
+
+    <h3>Data dari Tabel "users"</h3>
+    <button onclick="loadData()">🔄 Refresh Data</button>
+    <table id="tabelData">
+      <thead id="tabelHeader"></thead>
+      <tbody id="tabelBody"></tbody>
+    </table>
 
     <script>
       function tambahKolom() {
@@ -37,19 +59,20 @@
 
         fetch("/tambah-kolom", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ namaKolom, tipeData }),
         })
           .then((res) => res.json())
           .then((data) => {
+            const hasil = document.getElementById("hasil");
             if (data.error) {
-              document.getElementById("hasil").textContent =
-                "❌ Error: " + data.error.sqlMessage;
+              hasil.style.color = "red";
+              hasil.textContent =
+                "❌ Error: " + (data.error.sqlMessage || data.error);
             } else {
-              document.getElementById("hasil").textContent =
-                "✅ " + data.message;
+              hasil.style.color = "green";
+              hasil.textContent = "✅ " + data.message;
+              loadData(); // reload tabel otomatis
             }
           })
           .catch((err) => {
@@ -57,6 +80,39 @@
               "❌ Gagal: " + err.message;
           });
       }
+
+      function loadData() {
+        fetch("/data")
+          .then((res) => res.json())
+          .then((data) => {
+            const header = document.getElementById("tabelHeader");
+            const body = document.getElementById("tabelBody");
+            header.innerHTML = "";
+            body.innerHTML = "";
+
+            if (data.length === 0) {
+              header.innerHTML = "<tr><th>Data kosong</th></tr>";
+              return;
+            }
+
+            // Header
+            const kolom = Object.keys(data[0]);
+            const headerRow = kolom.map((k) => `<th>${k}</th>`).join("");
+            header.innerHTML = `<tr>${headerRow}</tr>`;
+
+            // Isi
+            data.forEach((row) => {
+              const rowHTML = kolom.map((k) => `<td>${row[k]}</td>`).join("");
+              body.innerHTML += `<tr>${rowHTML}</tr>`;
+            });
+          })
+          .catch((err) => {
+            alert("Gagal memuat data: " + err.message);
+          });
+      }
+
+      // Auto-load saat pertama dibuka
+      window.onload = loadData;
     </script>
   </body>
 </html>
