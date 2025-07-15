@@ -1,99 +1,62 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>CRUD Clever Cloud</title>
+    <title>Tambah Kolom MySQL</title>
     <style>
       body {
         font-family: sans-serif;
-        margin: 20px;
+        max-width: 400px;
+        margin: auto;
+        padding: 20px;
       }
-      input {
-        margin: 5px;
-        padding: 5px;
-      }
-      table,
-      th,
-      td {
-        border: 1px solid #333;
-        border-collapse: collapse;
-        padding: 5px;
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        margin-top: 10px;
       }
     </style>
   </head>
   <body>
-    <h2>Manajemen Data User</h2>
+    <h2>Tambah Kolom ke Tabel MySQL</h2>
 
-    <input type="text" id="nama" placeholder="Nama" />
-    <input type="email" id="email" placeholder="Email" />
-    <button onclick="tambahUser()">Tambah</button>
+    <label for="namaKolom">Nama Kolom:</label>
+    <input type="text" id="namaKolom" placeholder="Contoh: email" />
 
-    <table>
-      <thead>
-        <tr>
-          <th>ID</th>
-          <th>Nama</th>
-          <th>Email</th>
-          <th>Aksi</th>
-        </tr>
-      </thead>
-      <tbody id="tabel-user"></tbody>
-    </table>
+    <label for="tipeData">Tipe Data:</label>
+    <input type="text" id="tipeData" placeholder="Contoh: VARCHAR(100)" />
+
+    <button onclick="tambahKolom()">Tambah Kolom</button>
+
+    <p id="hasil" style="margin-top: 20px"></p>
 
     <script>
-      function loadData() {
-        fetch("/api/users")
+      function tambahKolom() {
+        const namaKolom = document.getElementById("namaKolom").value;
+        const tipeData = document.getElementById("tipeData").value;
+
+        fetch("/tambah-kolom", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ namaKolom, tipeData }),
+        })
           .then((res) => res.json())
           .then((data) => {
-            const tbody = document.getElementById("tabel-user");
-            tbody.innerHTML = "";
-            data.forEach((u) => {
-              tbody.innerHTML += `
-              <tr>
-                <td>${u.id}</td>
-                <td><input value="${u.nama}" onchange="editUser(${u.id}, this.value, null)" /></td>
-                <td><input value="${u.email}" onchange="editUser(${u.id}, null, this.value)" /></td>
-                <td><button onclick="hapusUser(${u.id})">Hapus</button></td>
-              </tr>`;
-            });
+            if (data.error) {
+              document.getElementById("hasil").textContent =
+                "❌ Error: " + data.error.sqlMessage;
+            } else {
+              document.getElementById("hasil").textContent =
+                "✅ " + data.message;
+            }
+          })
+          .catch((err) => {
+            document.getElementById("hasil").textContent =
+              "❌ Gagal: " + err.message;
           });
       }
-
-      function tambahUser() {
-        const nama = document.getElementById("nama").value;
-        const email = document.getElementById("email").value;
-        fetch("/api/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ nama, email }),
-        }).then(() => {
-          document.getElementById("nama").value = "";
-          document.getElementById("email").value = "";
-          loadData();
-        });
-      }
-
-      function editUser(id, nama, email) {
-        const row = [...document.querySelectorAll("tr")].find((r) =>
-          r.innerHTML.includes(`editUser(${id}`)
-        );
-        const inputs = row.querySelectorAll("input");
-        fetch(`/api/users/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            nama: nama ?? inputs[0].value,
-            email: email ?? inputs[1].value,
-          }),
-        }).then(loadData);
-      }
-
-      function hapusUser(id) {
-        if (confirm("Yakin hapus?")) {
-          fetch(`/api/users/${id}`, { method: "DELETE" }).then(loadData);
-        }
-      }
-
-      loadData();
     </script>
   </body>
 </html>

@@ -29,7 +29,7 @@ app.get("/", (req, res) => {
   res.send("API berjalan dengan baik");
 });
 
-// Endpoint untuk menampilkan semua data dari tabel `data`
+// Tampilkan semua data
 app.get("/data", (req, res) => {
   db.query("SELECT * FROM users", (err, results) => {
     if (err) {
@@ -39,7 +39,29 @@ app.get("/data", (req, res) => {
   });
 });
 
-// Menjalankan server
+// 🔧 Endpoint untuk menambah kolom
+app.post("/tambah-kolom", (req, res) => {
+  const { namaKolom, tipeData } = req.body;
+
+  if (!namaKolom || !tipeData) {
+    return res
+      .status(400)
+      .json({ error: "namaKolom dan tipeData wajib diisi" });
+  }
+
+  const query = `ALTER TABLE users ADD \`${namaKolom}\` ${tipeData}`;
+
+  db.query(query, (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: err });
+    }
+    res.json({
+      message: `Kolom '${namaKolom}' berhasil ditambahkan dengan tipe ${tipeData}`,
+    });
+  });
+});
+
+// Jalankan server
 app.listen(port, () => {
   console.log(`Server berjalan di http://localhost:${port}`);
 });
