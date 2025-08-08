@@ -1,0 +1,10 @@
+const firebaseConfig = {
+  apiKey: "AIzaSyBb2Ntswgw_s8IZfeW7uK9HYXT5e2_Xn64",
+  authDomain: "dbweb-690f4.firebaseapp.com",
+  databaseURL: "https://dbweb-690f4-default-rtdb.firebaseio.com",
+  projectId: "dbweb-690f4",
+  storageBucket: "dbweb-690f4.firebasestorage.app",
+  messagingSenderId: "555532137516",
+  appId: "1:555532137516:web:9b797965d92f4b58f80d89",
+  measurementId: "G-TGZ88HJ2QB"
+};

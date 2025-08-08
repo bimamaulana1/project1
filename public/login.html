@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login dan Akses QR</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 400px;
+        margin: 60px auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 12px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 12px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        font-size: 16px;
+      }
+      button {
+        background-color: #2e86de;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #1e6ab3;
+      }
+      video {
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 8px;
+      }
+      .hidden {
+        display: none;
+      }
+    </style>
+    <script
+      src="https://unpkg.com/html5-qrcode"
+      type="text/javascript"
+    ></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
+  </head>
+  <body>
+    <div id="form-login">
+      <h2>Login</h2>
+      <input type="text" id="nama" placeholder="Nama" required />
+      <input type="text" id="nim" placeholder="NIM" required />
+      <button onclick="login()">Masuk</button>
+    </div>
+
+    <div id="berhasil-login" class="hidden">
+      <h2>Selamat Datang</h2>
+      <p id="info-user"></p>
+      <select id="daftar-kamera"></select>
+      <button onclick="mulaiScanQR()">Scan QR</button>
+      <button onclick="logout()">Logout</button>
+      <video id="preview" autoplay playsinline class="hidden"></video>
+      <div id="qr-video" class="hidden" style="margin-top: 10px"></div>
+      <div
+        id="countdown"
+        style="font-size: 18px; margin-top: 15px; color: green"
+      ></div>
+      <div
+        id="info-akses"
+        style="font-size: 16px; margin-top: 10px; color: #444"
+      ></div>
+    </div>
+
+    <script>
+      const firebaseURL =
+        "https://dbweb-690f4-default-rtdb.firebaseio.com/pengguna.json";
+      const ledURL = "https://ledjs-12970-default-rtdb.firebaseio.com/led.json";
+      const kunciRahasia = "rahasia123"; // HARUS sama dengan di qr.html
+      let streamAktif;
+      let timerInaktif;
+
+      function login() {
+        const nama = document.getElementById("nama").value.trim();
+        const nim = document.getElementById("nim").value.trim();
+        if (!nama || !nim) {
+          alert("Nama dan NIM wajib diisi.");
+          return;
+        }
+        localStorage.setItem("nama", nama);
+        localStorage.setItem("nim", nim);
+        tampilkanBerhasilLogin();
+      }
+
+      function logout() {
+        localStorage.clear();
+        if (streamAktif) {
+          streamAktif.getTracks().forEach((track) => track.stop());
+          streamAktif = null;
+        }
+        document.getElementById("preview").classList.add("hidden");
+        document.getElementById("berhasil-login").classList.add("hidden");
+        document.getElementById("form-login").classList.remove("hidden");
+        document.getElementById("qr-video").innerHTML = "";
+        document.getElementById("qr-video").classList.add("hidden");
+        document.getElementById("countdown").textContent = "";
+      }
+
+      function tampilkanBerhasilLogin() {
+        const nama = localStorage.getItem("nama");
+        const nim = localStorage.getItem("nim");
+        if (nama && nim) {
+          document.getElementById(
+            "info-user"
+          ).textContent = `Nama: ${nama}, NIM: ${nim}`;
+          document.getElementById("form-login").classList.add("hidden");
+          document.getElementById("berhasil-login").classList.remove("hidden");
+          isiDropdownKamera();
+          mulaiPantauInaktivitas();
+        }
+      }
+
+      async function isiDropdownKamera() {
+        const select = document.getElementById("daftar-kamera");
+        select.innerHTML = "";
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = devices.filter((d) => d.kind === "videoinput");
+          videoInputs.forEach((device, i) => {
+            const opt = document.createElement("option");
+            opt.value = device.deviceId;
+            opt.text = device.label || `Kamera ${i + 1}`;
+            select.appendChild(opt);
+          });
+        } catch (e) {
+          alert("Gagal memuat daftar kamera: " + e.message);
+        }
+      }
+
+      async function mulaiScanQR() {
+        const qrDiv = document.getElementById("qr-video");
+        const kameraId = document.getElementById("daftar-kamera").value;
+        qrDiv.innerHTML = "";
+        qrDiv.classList.remove("hidden");
+
+        const scanner = new Html5Qrcode("qr-video");
+
+        try {
+          await scanner.start(
+            { deviceId: { exact: kameraId } },
+            { fps: 10, qrbox: 250 },
+            async (hasilQR) => {
+              try {
+                const bytes = CryptoJS.AES.decrypt(hasilQR, kunciRahasia);
+                const hasilDekripsi = bytes.toString(CryptoJS.enc.Utf8);
+
+                const now = Date.now();
+                if (hasilDekripsi.startsWith("aksesqr|")) {
+                  const [, timestamp] = hasilDekripsi.split("|");
+                  const selisih = now - parseInt(timestamp);
+                  if (selisih <= 30000) {
+                    await prosesAkses("MASUK");
+                  } else {
+                    alert("⚠️ QR MASUK sudah kedaluwarsa.");
+                  }
+                } else if (hasilDekripsi.startsWith("keluarqr|")) {
+                  const [, timestamp] = hasilDekripsi.split("|");
+                  const selisih = now - parseInt(timestamp);
+                  if (selisih <= 30000) {
+                    await prosesAkses("KELUAR");
+                  } else {
+                    alert("⚠️ QR KELUAR sudah kedaluwarsa.");
+                  }
+                } else {
+                  alert("QR tidak dikenali.");
+                }
+              } catch (e) {
+                alert("QR tidak valid atau gagal didekripsi.");
+              }
+
+              scanner.stop();
+              qrDiv.classList.add("hidden");
+              qrDiv.innerHTML = "";
+            },
+            (error) => {
+              console.warn("Scanning error", error);
+            }
+          );
+        } catch (err) {
+          console.error("Scan gagal", err);
+        }
+      }
+
+      async function prosesAkses(tipe) {
+        simpanAkses();
+        await fetch(ledURL, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify("on"),
+        });
+
+        const countdownEl = document.getElementById("countdown");
+        const infoAksesEl = document.getElementById("info-akses");
+        let sisaWaktu = 10;
+
+        const nama = localStorage.getItem("nama");
+        const nim = localStorage.getItem("nim");
+        const waktu = new Date().toLocaleTimeString();
+
+        if (tipe === "MASUK") {
+          infoAksesEl.textContent = `✅ ${nama} (${nim}) telah MASUK pada ${waktu}`;
+        } else if (tipe === "KELUAR") {
+          infoAksesEl.textContent = `⬅️ ${nama} (${nim}) telah KELUAR pada ${waktu}`;
+        }
+
+        countdownEl.textContent = `Akses ${tipe}: LED akan mati dalam ${sisaWaktu} detik`;
+
+        const hitungMundur = setInterval(() => {
+          sisaWaktu--;
+          if (sisaWaktu > 0) {
+            countdownEl.textContent = `Akses ${tipe}: LED akan mati dalam ${sisaWaktu} detik`;
+          } else {
+            countdownEl.textContent = `LED telah dimatikan setelah akses ${tipe}.`;
+            clearInterval(hitungMundur);
+          }
+        }, 1000);
+
+        setTimeout(() => {
+          fetch(ledURL, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify("off"),
+          });
+        }, 10000);
+      }
+
+      function simpanAkses() {
+        const nama = localStorage.getItem("nama");
+        const nim = localStorage.getItem("nim");
+        const waktu = new Date().toLocaleString();
+        if (!nama || !nim) return;
+        fetch(firebaseURL, {
+          method: "POST",
+          body: JSON.stringify({ nama, nim, waktu }),
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+
+      function mulaiPantauInaktivitas() {
+        clearTimeout(timerInaktif);
+        const resetTimer = () => {
+          clearTimeout(timerInaktif);
+          timerInaktif = setTimeout(() => {
+            alert("Anda telah logout karena tidak aktif selama 5 menit.");
+            logout();
+          }, 5 * 60 * 1000);
+        };
+        ["click", "mousemove", "keydown", "touchstart"].forEach((event) => {
+          document.addEventListener(event, resetTimer);
+        });
+        resetTimer();
+      }
+
+      window.onload = tampilkanBerhasilLogin;
+    </script>
+  </body>
+</html>

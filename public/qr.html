@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>QR Akses Dinamis</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.js"></script>
+  </head>
+  <body>
+    <h2>Scan QR Akses Ini</h2>
+    <canvas id="qr"></canvas>
+
+    <script>
+      const kunciRahasia = "rahasia123";
+      const timestamp = Date.now();
+      const isiAsli = `aksesqr|${timestamp}`;
+      const dataTerenkripsi = CryptoJS.AES.encrypt(
+        isiAsli,
+        kunciRahasia
+      ).toString();
+
+      QRCode.toCanvas(document.getElementById("qr"), dataTerenkripsi, {
+        width: 250,
+      });
+    </script>
+  </body>
+</html>

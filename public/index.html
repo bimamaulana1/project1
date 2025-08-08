@@ -1,56 +1,284 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>Data dari MySQL CleverCloud</title>
+    <title>Data Mahasiswa Dinamis</title>
     <style>
-      table,
+      .tabel-wrapper {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      body {
+        font-family: sans-serif;
+        padding: 20px;
+      }
+      table {
+        border-collapse: collapse;
+        table-layout: fixed;
+        width: max-content;
+        min-width: 100%;
+      }
       th,
       td {
         border: 1px solid black;
-        border-collapse: collapse;
-        padding: 8px;
+        padding: 5px;
+        text-align: left;
+        white-space: nowrap;
+        overflow: visible;
+      }
+      td:hover {
+        background-color: #eef;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      .action-btn {
+        margin-right: 5px;
+      }
+      input {
+        margin: 5px;
+      }
+      .field-actions button {
+        margin: 0 2px;
+      }
+      td {
+        max-width: 200px;
+        white-space: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+      }
+      td > div {
+        width: max-content;
       }
     </style>
   </head>
   <body>
-    <h2>Daftar Data</h2>
-    <table id="tabelData">
-      <thead>
-        <tr id="header"></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+    <h2>Data Mahasiswa</h2>
+    <button onclick="tambahKolom()">➕ Tambah Kolom</button>
+    <button onclick="tambahBaris()">➕ Tambah Baris</button>
+    <div class="tabel-wrapper">
+      <table>
+        <thead>
+          <tr id="table-field-actions"></tr>
+          <tr id="table-header"></tr>
+        </thead>
+        <tbody id="tabel-data"></tbody>
+      </table>
+    </div>
 
     <script>
-      fetch("/data")
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.length > 0) {
-            const header = document.getElementById("header");
-            Object.keys(data[0]).forEach((key) => {
-              const th = document.createElement("th");
-              th.textContent = key;
-              header.appendChild(th);
-            });
+      let kolomTerpakai = [];
 
-            const tbody = document.querySelector("tbody");
-            data.forEach((row) => {
-              const tr = document.createElement("tr");
-              Object.values(row).forEach((val) => {
-                const td = document.createElement("td");
-                td.textContent = val;
-                tr.appendChild(td);
-              });
-              tbody.appendChild(tr);
-            });
+      async function fetchData() {
+        const res = await fetch("/data");
+        return await res.json();
+      }
+
+      function buatRow(item, kolom) {
+        const tr = document.createElement("tr");
+        kolom.forEach((field) => {
+          const td = document.createElement("td");
+
+          if (field === "status") {
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.checked = item[field] === true || item[field] === "true";
+            checkbox.onchange = () => {
+              fetch("/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  id: item.id,
+                  [field]: checkbox.checked,
+                }),
+              })
+                .then((r) => r.text())
+                .then((msg) => console.log(msg));
+            };
+            td.appendChild(checkbox);
           } else {
-            document.body.innerHTML += "<p>Tidak ada data.</p>";
+            td.contentEditable = field !== "id";
+            const div = document.createElement("div");
+            div.innerText = item[field] ?? "";
+            td.appendChild(div);
+            td.dataset.field = field;
           }
-        })
-        .catch((err) => {
-          document.body.innerHTML += "<p>Gagal mengambil data.</p>";
-          console.error(err);
+
+          tr.appendChild(td);
         });
+
+        const tdAksi = document.createElement("td");
+        const btnSimpan = document.createElement("button");
+        btnSimpan.innerText = "💾";
+        btnSimpan.className = "action-btn";
+        btnSimpan.onclick = () => {
+          const updated = {};
+          tr.querySelectorAll("td[contenteditable='true']").forEach((td) => {
+            const f = td.dataset.field;
+            updated[f] = td.innerText;
+          });
+
+          fetch("/update", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: item.id, ...updated }),
+          })
+            .then((r) => r.text())
+            .then(alert);
+        };
+
+        const btnHapus = document.createElement("button");
+        btnHapus.innerText = "🗑️";
+        btnHapus.onclick = () => {
+          if (!confirm("Yakin hapus data ini?")) return;
+          fetch("/hapus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: item.id }),
+          })
+            .then((r) => r.text())
+            .then((msg) => {
+              alert(msg);
+              loadTable();
+            });
+        };
+
+        tdAksi.appendChild(btnSimpan);
+        tdAksi.appendChild(btnHapus);
+        tr.appendChild(tdAksi);
+        return tr;
+      }
+
+      async function loadTable() {
+        const data = await fetchData();
+        const semuaField = new Set();
+        const semuaData = [];
+
+        for (const id in data) {
+          const obj = { id, ...data[id] };
+          semuaData.push(obj);
+          Object.keys(obj).forEach((k) => {
+            if (k !== "id") semuaField.add(k);
+          });
+        }
+
+        let kolom = Array.from(semuaField);
+        if (!kolom.includes("status")) kolom.unshift("status");
+        kolom.unshift("id");
+        kolomTerpakai = kolom.filter((k) => k !== "id" && k !== "status");
+
+        const headerRow = document.getElementById("table-header");
+        const actionRow = document.getElementById("table-field-actions");
+        headerRow.innerHTML = "";
+        actionRow.innerHTML = "";
+
+        kolom.forEach((field) => {
+          const thHeader = document.createElement("th");
+          thHeader.innerText = field;
+          headerRow.appendChild(thHeader);
+
+          const thAction = document.createElement("th");
+
+          if (field !== "id" && field !== "status") {
+            const div = document.createElement("div");
+            div.className = "field-actions";
+
+            const btnEdit = document.createElement("button");
+            btnEdit.innerText = "📝";
+            btnEdit.onclick = () => {
+              const baru = prompt(`Ubah nama kolom "${field}" ke:`);
+              if (baru && baru !== field) {
+                fetch("/editkolom", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ dari: field, ke: baru }),
+                })
+                  .then((r) => r.text())
+                  .then((msg) => {
+                    alert(msg);
+                    loadTable();
+                  });
+              }
+            };
+            div.appendChild(btnEdit);
+
+            const btnHapus = document.createElement("button");
+            btnHapus.innerText = "🗑️";
+            btnHapus.onclick = () => {
+              if (confirm(`Hapus kolom "${field}" dari semua data?`)) {
+                fetch("/hapuskolom", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ kolom: field }),
+                })
+                  .then((r) => r.text())
+                  .then((msg) => {
+                    alert(msg);
+                    loadTable();
+                  });
+              }
+            };
+            div.appendChild(btnHapus);
+            thAction.appendChild(div);
+          }
+
+          actionRow.appendChild(thAction);
+        });
+
+        headerRow.appendChild(document.createElement("th"));
+        actionRow.appendChild(document.createElement("th"));
+
+        const tbody = document.getElementById("tabel-data");
+        tbody.innerHTML = "";
+        semuaData.forEach((item) => {
+          tbody.appendChild(buatRow(item, kolom));
+        });
+      }
+
+      function tambahKolom() {
+        const namaKolom = prompt("Masukkan nama kolom baru:");
+        if (!namaKolom) return;
+
+        const tipe = prompt(
+          `Tipe data untuk kolom "${namaKolom}" (string, number, boolean, date):`,
+          "string"
+        );
+        if (!["string", "number", "boolean", "date"].includes(tipe)) {
+          alert("Tipe data tidak valid.");
+          return;
+        }
+
+        fetch("/tambahkolom", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ kolom: namaKolom, tipe }),
+        })
+          .then((r) => r.text())
+          .then((msg) => {
+            alert(msg);
+            loadTable();
+          });
+      }
+
+      function tambahBaris() {
+        const data = {};
+        kolomTerpakai.forEach((k) => {
+          data[k] = prompt(`Isi untuk kolom ${k}:`) || "";
+        });
+        data["status"] = false;
+
+        fetch("/tambah", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(data),
+        })
+          .then((r) => r.text())
+          .then((msg) => {
+            alert(msg);
+            loadTable();
+          });
+      }
+
+      window.onload = loadTable;
     </script>
   </body>
 </html>
